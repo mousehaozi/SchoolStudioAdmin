@@ -5,16 +5,8 @@
         <div class="page-header">
           <div class="page-title">工作室管理</div>
           <div class="page-actions">
-            <el-button type="primary" plain :icon="Plus" @click="openCreate"
-              >新增工作室</el-button
-            >
-            <el-button
-              plain
-              :icon="Refresh"
-              :loading="loading"
-              @click="fetchData"
-              >刷新</el-button
-            >
+            <el-button type="primary" plain :icon="Plus" @click="openCreate">新增工作室</el-button>
+            <el-button plain :icon="Refresh" :loading="loading" @click="fetchData">刷新</el-button>
           </div>
         </div>
       </template>
@@ -25,23 +17,24 @@
         <el-table-column label="图标" width="80">
           <template #default="{ row }">
             <el-avatar :size="40" :src="row.iconUrl" shape="square">
-              <el-icon><Picture /></el-icon>
+              <el-icon>
+                <Picture />
+              </el-icon>
             </el-avatar>
           </template>
         </el-table-column>
         <el-table-column prop="name" label="名称" min-width="150" />
-        <el-table-column
-          prop="simpleIntro"
-          label="简介"
-          min-width="250"
-          show-overflow-tooltip
-        />
+        <el-table-column prop="studioLevel" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.studioLevel === 0 ? 'warning' : 'success'" size="small">
+              {{ row.studioLevel === 0 ? "国家级" : "省市级" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="simpleIntro" label="简介" min-width="250" show-overflow-tooltip />
         <el-table-column prop="enableStatus" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag
-              :type="row.enableStatus === 1 ? 'success' : 'info'"
-              size="small"
-            >
+            <el-tag :type="row.enableStatus === 1 ? 'success' : 'info'" size="small">
               {{ row.enableStatus === 1 ? "启用" : "停用" }}
             </el-tag>
           </template>
@@ -60,18 +53,11 @@
                   <el-dropdown-item :icon="Edit" @click="openEdit(row)">
                     编辑
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    :icon="row.enableStatus === 1 ? VideoPause : VideoPlay"
-                    @click="handleToggleStatus(row)"
-                  >
+                  <el-dropdown-item :icon="row.enableStatus === 1 ? VideoPause : VideoPlay"
+                    @click="handleToggleStatus(row)">
                     {{ row.enableStatus === 1 ? "停用" : "启用" }}
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    divided
-                    :icon="Delete"
-                    @click="handleDelete(row)"
-                    style="color: #f56c6c"
-                  >
+                  <el-dropdown-item divided :icon="Delete" @click="handleDelete(row)" style="color: #f56c6c">
                     删除
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -83,34 +69,16 @@
     </CommonCard>
 
     <!-- 编辑/新增弹窗 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑工作室' : '新增工作室'"
-      width="500px"
-      align-center
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-        style="padding-right: 20px"
-      >
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑工作室' : '新增工作室'" width="500px" align-center>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="padding-right: 20px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入工作室名称" />
         </el-form-item>
         <el-form-item label="图标 URL" prop="iconUrl">
           <div class="upload-container">
-            <el-input
-              v-model="form.iconUrl"
-              placeholder="请输入图片 URL 或上传"
-            >
+            <el-input v-model="form.iconUrl" placeholder="请输入图片 URL 或上传">
               <template #append>
-                <el-upload
-                  :http-request="handleUpload"
-                  :show-file-list="false"
-                  accept="image/*"
-                >
+                <el-upload :http-request="handleUpload" :show-file-list="false" accept="image/*">
                   <el-button plain :icon="Upload">上传</el-button>
                 </el-upload>
               </template>
@@ -121,12 +89,13 @@
           </div>
         </el-form-item>
         <el-form-item label="简介" prop="simpleIntro">
-          <el-input
-            v-model="form.simpleIntro"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入简介"
-          />
+          <el-input v-model="form.simpleIntro" type="textarea" :rows="3" placeholder="请输入简介" />
+        </el-form-item>
+        <el-form-item label="类型" prop="studioLevel">
+          <el-radio-group v-model="form.studioLevel">
+            <el-radio :label="0">国家级</el-radio>
+            <el-radio :label="1">省市级</el-radio>
+          </el-radio-group>
         </el-form-item>
         <el-form-item label="状态" prop="enableStatus">
           <el-radio-group v-model="form.enableStatus">
@@ -137,9 +106,7 @@
       </el-form>
       <template #footer>
         <el-button plain @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" plain :loading="saving" @click="submitForm"
-          >保存</el-button
-        >
+        <el-button type="primary" plain :loading="saving" @click="submitForm">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -201,6 +168,7 @@ const form = reactive({
   name: "",
   iconUrl: "",
   simpleIntro: "",
+  studioLevel: 1, // 默认省部级
   enableStatus: 1,
 });
 
@@ -216,6 +184,7 @@ function openCreate() {
   form.name = "";
   form.iconUrl = "";
   form.simpleIntro = "";
+  form.studioLevel = 1;
   form.enableStatus = 1;
   dialogVisible.value = true;
 }
@@ -226,6 +195,7 @@ function openEdit(row) {
   form.name = row.name;
   form.iconUrl = row.iconUrl;
   form.simpleIntro = row.simpleIntro;
+  form.studioLevel = row.studioLevel ?? 1;
   form.enableStatus = row.enableStatus;
   dialogVisible.value = true;
 }
@@ -326,22 +296,27 @@ onMounted(() => {
 .page {
   padding: 0;
 }
+
 .page-card {
   border: none;
 }
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+
 .page-title {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
 }
+
 .upload-container {
   width: 100%;
 }
+
 .icon-preview {
   margin-top: 10px;
   width: 60px;
@@ -350,6 +325,7 @@ onMounted(() => {
   overflow: hidden;
   border: 1px solid #dcdfe6;
 }
+
 .icon-preview img {
   width: 100%;
   height: 100%;

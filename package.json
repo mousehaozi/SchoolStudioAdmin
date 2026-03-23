@@ -17,7 +17,7 @@
     "@wangeditor/editor-for-vue": "^5.1.12",
     "axios": "^1.13.2",
     "element-plus": "^2.13.1",
-    "motion-v": "^1.9.0",
+    "motion-v": "^1.10.3",
     "pinia": "^3.0.4",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
