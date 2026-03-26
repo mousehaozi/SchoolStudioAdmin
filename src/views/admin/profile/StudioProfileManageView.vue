@@ -434,6 +434,47 @@ import {
 } from "@/api/admin";
 import { formatDateTime } from "@/utils/format";
 
+const compressToWebp = (file, quality = 0.8) => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image/")) {
+      resolve(file);
+      return;
+    }
+    // 如果已经是 webp 格式，且大小适中（比如不大于 1MB），可以选择不压缩，但为了保证大小，统一处理
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const fileName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+              const newFile = new File([blob], fileName, {
+                type: "image/webp",
+                lastModified: Date.now(),
+              });
+              resolve(newFile);
+            } else {
+              resolve(file); // 失败则原样返回
+            }
+          },
+          "image/webp",
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 const loading = ref(false);
 const saving = ref(false);
 const currentProfile = ref(null);
@@ -516,7 +557,8 @@ async function customUploadCover(options) {
   coverProgressVisible.value = true;
   coverProgress.value = 0;
   try {
-    const res = await uploadAdminImage(file, (p) => (coverProgress.value = p));
+    const compressedFile = await compressToWebp(file);
+    const res = await uploadAdminImage(compressedFile, (p) => (coverProgress.value = p));
     const url = res.data?.data?.url;
     if (url) {
       form.coverUrl = url;
@@ -543,11 +585,15 @@ const editorConfig = {
     uploadImage: {
       async customUpload(file, insertFn) {
         let loadingInstance = ElLoading.service({
-          text: '图片上传中... 0%',
+          text: '图片处理中...',
           background: 'rgba(255, 255, 255, 0.7)',
         });
         try {
-          const res = await uploadAdminImage(file, (p) => {
+          const compressedFile = await compressToWebp(file);
+          if (loadingInstance) {
+            loadingInstance.setText('图片上传中... 0%');
+          }
+          const res = await uploadAdminImage(compressedFile, (p) => {
             if (loadingInstance) {
               loadingInstance.setText(`图片上传中... ${p || 0}%`);
             }
