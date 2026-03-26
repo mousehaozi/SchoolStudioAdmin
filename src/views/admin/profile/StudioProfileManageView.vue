@@ -410,7 +410,7 @@ import {
   ref,
   shallowRef,
 } from "vue";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElLoading } from "element-plus";
 import { nextTick } from "vue";
 import {
   Check,
@@ -542,33 +542,55 @@ const editorConfig = {
   MENU_CONF: {
     uploadImage: {
       async customUpload(file, insertFn) {
+        let loadingInstance = ElLoading.service({
+          text: '图片上传中... 0%',
+          background: 'rgba(255, 255, 255, 0.7)',
+        });
         try {
-          const res = await uploadAdminImage(file);
+          const res = await uploadAdminImage(file, (p) => {
+            if (loadingInstance) {
+              loadingInstance.setText(`图片上传中... ${p || 0}%`);
+            }
+          });
           const url = res.data?.data?.url;
           if (url) {
             insertFn(url, "image", url);
+            ElMessage.success("图片上传成功");
           } else {
             ElMessage.error("图片上传失败");
           }
         } catch (e) {
           console.error(e);
           ElMessage.error("图片上传出错");
+        } finally {
+          if (loadingInstance) loadingInstance.close();
         }
       },
     },
     uploadVideo: {
       async customUpload(file, insertFn) {
+        let loadingInstance = ElLoading.service({
+          text: '视频上传中... 0%',
+          background: 'rgba(255, 255, 255, 0.7)',
+        });
         try {
-          const res = await uploadAdminImage(file);
+          const res = await uploadAdminImage(file, (p) => {
+            if (loadingInstance) {
+              loadingInstance.setText(`视频上传中... ${p || 0}%`);
+            }
+          });
           const url = res.data?.data?.url;
           if (url) {
             insertFn(url);
+            ElMessage.success("视频上传成功");
           } else {
             ElMessage.error("视频上传失败");
           }
         } catch (e) {
           console.error(e);
           ElMessage.error("视频上传出错");
+        } finally {
+          if (loadingInstance) loadingInstance.close();
         }
       },
     },
