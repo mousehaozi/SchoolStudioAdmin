@@ -11,16 +11,16 @@
           <div class="page-actions">
             <!-- 工作室选择器 -->
             <el-select
-              v-if="profileList.length > 1"
-              v-model="selectedProfileId"
+              v-if="studioList.length > 1"
+              v-model="selectedStudioId"
               placeholder="请选择工作室"
               style="width: 220px; margin-right: 12px"
-              @change="handleProfileChange"
+              @change="handleStudioChange"
             >
               <el-option
-                v-for="item in profileList"
+                v-for="item in studioList"
                 :key="item.id"
-                :label="getStudioName(item.studioId)"
+                :label="item.name"
                 :value="item.id"
               />
             </el-select>
@@ -29,9 +29,9 @@
               type="primary"
               plain
               :icon="Edit"
-              :disabled="!currentProfile"
+              :disabled="!selectedStudioId"
               @click="openOverwrite"
-              >编辑简介</el-button
+              >{{ currentProfile ? "编辑简介" : "添加简介" }}</el-button
             >
             <el-button
               plain
@@ -184,14 +184,14 @@
         <el-empty
           v-else
           :description="
-            profileList.length > 0
+            studioList.length > 0
               ? '请在上方选择工作室以查看详情'
-              : '暂无简介数据'
+              : '暂无工作室数据'
           "
         >
           <template #image>
             <el-icon
-              v-if="profileList.length > 0"
+              v-if="studioList.length > 0"
               style="
                 font-size: 48px;
                 color: var(--el-color-primary);
@@ -479,7 +479,8 @@ const loading = ref(false);
 const saving = ref(false);
 const currentProfile = ref(null);
 const profileList = ref([]);
-const selectedProfileId = ref(null);
+const studioList = ref([]);
+const selectedStudioId = ref(null);
 const studioMap = ref({});
 
 const dialogVisible = ref(false);
@@ -662,53 +663,58 @@ const rules = {
 async function fetchList() {
   loading.value = true;
   try {
-    // 获取工作室列表以获取名称
-    try {
-      const sRes = await getAdminStudios();
-      const sList = sRes.data?.data || [];
-      studioMap.value = {};
-      sList.forEach((s) => {
-        studioMap.value[s.id] = s.name;
-      });
-    } catch (e) {
-      console.error("Fetch studios failed", e);
-    }
+    const sRes = await getAdminStudios();
+    studioList.value = sRes.data?.data || [];
+    studioMap.value = {};
+    studioList.value.forEach((s) => {
+      studioMap.value[s.id] = s.name;
+    });
 
     const res = await getAdminStudioProfiles();
     const data = res.data?.data;
     profileList.value = Array.isArray(data) ? data : [];
 
-    if (profileList.value.length === 1) {
+    if (studioList.value.length === 1) {
       // 只有一个时，自动选择
-      selectedProfileId.value = profileList.value[0].id;
-      currentProfile.value = profileList.value[0];
-    } else if (profileList.value.length > 1) {
-      // 多个时，如果之前没选过或者选的已经不在列表中了，就不自动选
+      selectedStudioId.value = studioList.value[0].id;
+      currentProfile.value =
+        profileList.value.find((p) => p.studioId === selectedStudioId.value) ||
+        null;
+    } else if (studioList.value.length > 1) {
+      // 多个时，如果之前没选过或者选的已经不在列表中了，也尝试自动选择第一个？或者保持现状
       if (
-        !selectedProfileId.value ||
-        !profileList.value.find((p) => p.id === selectedProfileId.value)
+        !selectedStudioId.value ||
+        !studioList.value.find((s) => s.id === selectedStudioId.value)
       ) {
-        selectedProfileId.value = null;
-        currentProfile.value = null;
+        // 如果没有选过，为了用户体验，默认选第一个吧
+        if (studioList.value.length > 0) {
+          selectedStudioId.value = studioList.value[0].id;
+          currentProfile.value =
+            profileList.value.find(
+              (p) => p.studioId === selectedStudioId.value
+            ) || null;
+        } else {
+          selectedStudioId.value = null;
+          currentProfile.value = null;
+        }
       } else {
-        currentProfile.value = profileList.value.find(
-          (p) => p.id === selectedProfileId.value,
-        );
+        currentProfile.value =
+          profileList.value.find(
+            (p) => p.studioId === selectedStudioId.value
+          ) || null;
       }
     } else {
       currentProfile.value = null;
-      selectedProfileId.value = null;
+      selectedStudioId.value = null;
     }
   } finally {
     loading.value = false;
   }
 }
 
-function handleProfileChange(id) {
-  const profile = profileList.value.find((p) => p.id === id);
-  if (profile) {
-    currentProfile.value = profile;
-  }
+function handleStudioChange(studioId) {
+  currentProfile.value =
+    profileList.value.find((p) => p.studioId === studioId) || null;
 }
 
 function getStudioName(studioId) {
@@ -737,7 +743,7 @@ function openOverwrite() {
     form.coreFunctions = "";
     form.orgStructure = [];
     form.contactUs = [];
-    form.studioId = null;
+    form.studioId = selectedStudioId.value;
   }
   dialogVisible.value = true;
 }
