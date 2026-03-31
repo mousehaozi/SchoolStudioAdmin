@@ -222,16 +222,6 @@ function normalizeStudioRecord(item) {
   };
 }
 
-function sortStudioRecords(list) {
-  return [...list].sort((a, b) => {
-    const aSort = Number(a.sortOrder ?? 0);
-    const bSort = Number(b.sortOrder ?? 0);
-
-    if (aSort !== bSort) return aSort - bSort;
-    return Number(a.id ?? 0) - Number(b.id ?? 0);
-  });
-}
-
 // 列表获取
 async function fetchData() {
   loading.value = true;
@@ -240,9 +230,7 @@ async function fetchData() {
     // 根据 spec，返回的是对象，但通常 list 接口会返回数组或包含数组的对象
     // 如果 spec 中 example 是 timestamp, status 等，可能是错误示例或者结构不完整
     // 我们假设它返回 data: [] 或者直接是数组
-    records.value = sortStudioRecords(
-      (res.data?.data || []).map(normalizeStudioRecord),
-    );
+    records.value = (res.data?.data || []).map(normalizeStudioRecord);
   } catch (error) {
     console.error("获取工作室列表失败", error);
   } finally {
@@ -353,7 +341,7 @@ async function handleSortOrderBlur(row) {
     });
     row.sortOrder = nextValue;
     row._originalSortOrder = nextValue;
-    records.value = sortStudioRecords(records.value);
+    await fetchData();
     ElMessage.success("排序已更新");
   } catch (error) {
     console.error("更新排序失败", error);
