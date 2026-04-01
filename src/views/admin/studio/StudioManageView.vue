@@ -1,187 +1,3 @@
-<template>
-  <div class="page">
-    <CommonCard shadow="never" class="page-card">
-      <template #header>
-        <div class="page-header">
-          <div class="page-title">工作室管理</div>
-          <div class="page-actions">
-            <el-button type="primary" plain :icon="Plus" @click="openCreate"
-              >新增工作室</el-button
-            >
-            <el-button
-              plain
-              :icon="Refresh"
-              :loading="loading"
-              @click="fetchData"
-              >刷新</el-button
-            >
-          </div>
-        </div>
-      </template>
-
-      <!-- 数据表格 -->
-      <el-table :data="records" v-loading="loading" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column label="图标" width="80">
-          <template #default="{ row }">
-            <el-avatar :size="40" :src="row.iconUrl" shape="square">
-              <el-icon>
-                <Picture />
-              </el-icon>
-            </el-avatar>
-          </template>
-        </el-table-column>
-        <el-table-column prop="name" label="名称" min-width="150" />
-        <el-table-column label="排序" width="140" align="center">
-          <template #default="{ row }">
-            <el-input
-              v-model="row.sortOrder"
-              size="small"
-              placeholder="排序"
-              inputmode="numeric"
-              :disabled="sortSavingMap[row.id]"
-              @blur="handleSortOrderBlur(row)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column prop="studioLevel" label="类型" width="100">
-          <template #default="{ row }">
-            <el-tag
-              :type="row.studioLevel === 0 ? 'warning' : 'success'"
-              size="small"
-            >
-              {{ row.studioLevel === 0 ? "国家级" : "省市级" }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="simpleIntro"
-          label="简介"
-          min-width="250"
-          show-overflow-tooltip
-        />
-        <el-table-column prop="enableStatus" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag
-              :type="row.enableStatus === 1 ? 'success' : 'info'"
-              size="small"
-            >
-              {{ row.enableStatus === 1 ? "启用" : "停用" }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatTime(row.createdAt) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-dropdown trigger="click">
-              <el-button size="small" plain :icon="MoreFilled" />
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item :icon="Edit" @click="openEdit(row)">
-                    编辑
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    :icon="row.enableStatus === 1 ? VideoPause : VideoPlay"
-                    @click="handleToggleStatus(row)"
-                  >
-                    {{ row.enableStatus === 1 ? "停用" : "启用" }}
-                  </el-dropdown-item>
-                  <el-dropdown-item
-                    divided
-                    :icon="Delete"
-                    @click="handleDelete(row)"
-                    style="color: #f56c6c"
-                  >
-                    删除
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-      </el-table>
-    </CommonCard>
-
-    <!-- 编辑/新增弹窗 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑工作室' : '新增工作室'"
-      width="500px"
-      align-center
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-        style="padding-right: 20px"
-      >
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入工作室名称" />
-        </el-form-item>
-        <el-form-item label="图标 URL" prop="iconUrl">
-          <div class="upload-container">
-            <el-input
-              v-model="form.iconUrl"
-              placeholder="请输入图片 URL 或上传"
-            >
-              <template #append>
-                <el-upload
-                  :http-request="handleUpload"
-                  :show-file-list="false"
-                  accept="image/*"
-                >
-                  <el-button plain :icon="Upload">上传</el-button>
-                </el-upload>
-              </template>
-            </el-input>
-            <div class="icon-preview" v-if="form.iconUrl">
-              <img :src="form.iconUrl" alt="Preview" />
-            </div>
-          </div>
-        </el-form-item>
-        <el-form-item label="简介" prop="simpleIntro">
-          <el-input
-            v-model="form.simpleIntro"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入简介"
-          />
-        </el-form-item>
-        <el-form-item label="排序" prop="sortOrder">
-          <el-input
-            v-model="form.sortOrder"
-            placeholder="请输入排序值"
-            inputmode="numeric"
-          />
-        </el-form-item>
-        <el-form-item label="类型" prop="studioLevel">
-          <el-radio-group v-model="form.studioLevel">
-            <el-radio :label="0">国家级</el-radio>
-            <el-radio :label="1">省市级</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="状态" prop="enableStatus">
-          <el-radio-group v-model="form.enableStatus">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button plain @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" plain :loading="saving" @click="submitForm"
-          >保存</el-button
-        >
-      </template>
-    </el-dialog>
-  </div>
-</template>
-
 <script setup>
 import { ref, reactive, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -205,9 +21,6 @@ import {
   uploadAdminImage,
 } from "@/api/admin";
 import { formatDate } from "@/utils/format";
-import { useUserStore } from "@/stores/user";
-
-const userStore = useUserStore();
 const loading = ref(false);
 const saving = ref(false);
 const records = ref([]);
@@ -362,7 +175,7 @@ async function handleToggleStatus(row) {
       "提示",
       {
         type: "warning",
-      },
+      }
     );
     await toggleAdminStudioStatus(row.id, newStatus);
     ElMessage.success(`${actionText}成功`);
@@ -382,7 +195,7 @@ async function handleDelete(row) {
         type: "error",
         confirmButtonText: "确定删除",
         confirmButtonClass: "el-button--danger",
-      },
+      }
     );
     await deleteAdminStudio(row.id);
     ElMessage.success("删除成功");
@@ -419,6 +232,190 @@ onMounted(() => {
   fetchData();
 });
 </script>
+
+<template>
+  <div class="page">
+    <CommonCard shadow="never" class="page-card">
+      <template #header>
+        <div class="page-header">
+          <div class="page-title">工作室管理</div>
+          <div class="page-actions">
+            <el-button type="primary" plain :icon="Plus" @click="openCreate"
+              >新增工作室</el-button
+            >
+            <el-button
+              plain
+              :icon="Refresh"
+              :loading="loading"
+              @click="fetchData"
+              >刷新</el-button
+            >
+          </div>
+        </div>
+      </template>
+
+      <!-- 数据表格 -->
+      <el-table v-loading="loading" :data="records" style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="图标" width="80">
+          <template #default="{ row }">
+            <el-avatar :size="40" :src="row.iconUrl" shape="square">
+              <el-icon>
+                <Picture />
+              </el-icon>
+            </el-avatar>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="名称" min-width="150" />
+        <el-table-column label="排序" width="140" align="center">
+          <template #default="{ row }">
+            <el-input
+              v-model="row.sortOrder"
+              size="small"
+              placeholder="排序"
+              inputmode="numeric"
+              :disabled="sortSavingMap[row.id]"
+              @blur="handleSortOrderBlur(row)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="studioLevel" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.studioLevel === 0 ? 'warning' : 'success'"
+              size="small"
+            >
+              {{ row.studioLevel === 0 ? "国家级" : "省市级" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column
+          prop="simpleIntro"
+          label="简介"
+          min-width="250"
+          show-overflow-tooltip
+        />
+        <el-table-column prop="enableStatus" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.enableStatus === 1 ? 'success' : 'info'"
+              size="small"
+            >
+              {{ row.enableStatus === 1 ? "启用" : "停用" }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.createdAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-dropdown trigger="click">
+              <el-button size="small" plain :icon="MoreFilled" />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item :icon="Edit" @click="openEdit(row)">
+                    编辑
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    :icon="row.enableStatus === 1 ? VideoPause : VideoPlay"
+                    @click="handleToggleStatus(row)"
+                  >
+                    {{ row.enableStatus === 1 ? "停用" : "启用" }}
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    divided
+                    :icon="Delete"
+                    style="color: #f56c6c"
+                    @click="handleDelete(row)"
+                  >
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+        </el-table-column>
+      </el-table>
+    </CommonCard>
+
+    <!-- 编辑/新增弹窗 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑工作室' : '新增工作室'"
+      width="500px"
+      align-center
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="100px"
+        style="padding-right: 20px"
+      >
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="form.name" placeholder="请输入工作室名称" />
+        </el-form-item>
+        <el-form-item label="图标 URL" prop="iconUrl">
+          <div class="upload-container">
+            <el-input
+              v-model="form.iconUrl"
+              placeholder="请输入图片 URL 或上传"
+            >
+              <template #append>
+                <el-upload
+                  :http-request="handleUpload"
+                  :show-file-list="false"
+                  accept="image/*"
+                >
+                  <el-button plain :icon="Upload">上传</el-button>
+                </el-upload>
+              </template>
+            </el-input>
+            <div v-if="form.iconUrl" class="icon-preview">
+              <img :src="form.iconUrl" alt="Preview" />
+            </div>
+          </div>
+        </el-form-item>
+        <el-form-item label="简介" prop="simpleIntro">
+          <el-input
+            v-model="form.simpleIntro"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入简介"
+          />
+        </el-form-item>
+        <el-form-item label="排序" prop="sortOrder">
+          <el-input
+            v-model="form.sortOrder"
+            placeholder="请输入排序值"
+            inputmode="numeric"
+          />
+        </el-form-item>
+        <el-form-item label="类型" prop="studioLevel">
+          <el-radio-group v-model="form.studioLevel">
+            <el-radio :label="0">国家级</el-radio>
+            <el-radio :label="1">省市级</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="状态" prop="enableStatus">
+          <el-radio-group v-model="form.enableStatus">
+            <el-radio :label="1">启用</el-radio>
+            <el-radio :label="0">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button plain @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" plain :loading="saving" @click="submitForm"
+          >保存</el-button
+        >
+      </template>
+    </el-dialog>
+  </div>
+</template>
 
 <style scoped>
 .page {

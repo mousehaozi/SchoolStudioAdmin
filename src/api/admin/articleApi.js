@@ -1,40 +1,40 @@
-import request from '@/utils/request'
+import request from "@/utils/request";
 
 export function getAdminIeArticlesPage(params) {
   return request({
-    url: '/admin/ie-article',
-    method: 'get',
+    url: "/admin/ie-article",
+    method: "get",
     params,
-  })
+  });
 }
 
 export function createAdminIeArticle(data) {
   return request({
-    url: '/admin/ie-article',
-    method: 'post',
+    url: "/admin/ie-article",
+    method: "post",
     data,
-  })
+  });
 }
 
 export function updateAdminIeArticle(id, data) {
   return request({
     url: `/admin/ie-article/${id}`,
-    method: 'put',
+    method: "put",
     data,
-  })
+  });
 }
 
 export function deleteAdminIeArticle(id) {
   return request({
     url: `/admin/ie-article/${id}`,
-    method: 'delete',
-  })
+    method: "delete",
+  });
 }
 
 export function setAdminIeArticlePublishStatus(id, publishStatus) {
   return request({
     url: `/admin/ie-article/${id}/publish`,
-    method: 'post',
+    method: "post",
     params: { publishStatus },
-  })
+  });
 }

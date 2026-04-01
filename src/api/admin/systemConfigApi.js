@@ -1,13 +1,13 @@
-import request from '@/utils/request'
+import request from "@/utils/request";
 
 /**
  * 系统配置列表
  */
 export function getAdminSystemConfigs() {
   return request({
-    url: '/admin/system-configs',
-    method: 'get'
-  })
+    url: "/admin/system-configs",
+    method: "get",
+  });
 }
 
 /**
@@ -15,8 +15,8 @@ export function getAdminSystemConfigs() {
  */
 export function upsertAdminSystemConfig(data) {
   return request({
-    url: '/admin/system-configs',
-    method: 'post',
-    data
-  })
+    url: "/admin/system-configs",
+    method: "post",
+    data,
+  });
 }

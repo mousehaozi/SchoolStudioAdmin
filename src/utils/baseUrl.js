@@ -3,5 +3,5 @@
  */
 export function baseUrl() {
   // return "/api"; // 本地开发环境
-  return 'http://192.168.0.121:5001'
+  return "http://192.168.0.121:5001";
 }

@@ -1,21 +1,3 @@
-<template>
-  <div class="common-card" :class="[`is-${shadow}-shadow`]">
-    <div class="common-card__header" v-if="$slots.header || title">
-      <slot name="header">
-        <div class="common-card__title">{{ title }}</div>
-      </slot>
-    </div>
-
-    <div class="common-card__body" :style="bodyStyle">
-      <slot></slot>
-    </div>
-
-    <div class="common-card__footer" v-if="$slots.footer">
-      <slot name="footer"></slot>
-    </div>
-  </div>
-</template>
-
 <script setup>
 defineProps({
   title: {
@@ -33,6 +15,24 @@ defineProps({
   },
 });
 </script>
+
+<template>
+  <div class="common-card" :class="[`is-${shadow}-shadow`]">
+    <div v-if="$slots.header || title" class="common-card__header">
+      <slot name="header">
+        <div class="common-card__title">{{ title }}</div>
+      </slot>
+    </div>
+
+    <div class="common-card__body" :style="bodyStyle">
+      <slot></slot>
+    </div>
+
+    <div v-if="$slots.footer" class="common-card__footer">
+      <slot name="footer"></slot>
+    </div>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .common-card {

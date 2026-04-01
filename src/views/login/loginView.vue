@@ -1,3 +1,62 @@
+<script setup>
+import { ref, reactive } from "vue";
+import { useRouter } from "vue-router";
+import { ElMessage } from "element-plus";
+import { User, Lock } from "@element-plus/icons-vue";
+import { useUserStore } from "@/stores/user";
+import { adminLogin } from "@/api/admin";
+
+const router = useRouter();
+const userStore = useUserStore();
+
+const loginFormRef = ref(null);
+const loading = ref(false);
+const rememberMe = ref(false);
+
+const loginForm = reactive({
+  username: "",
+  password: "",
+});
+
+const loginRules = {
+  username: [{ required: true, message: "请填写账号", trigger: "blur" }],
+  password: [{ required: true, message: "请填写密码", trigger: "blur" }],
+};
+
+const handleLogin = async () => {
+  if (!loginFormRef.value) return;
+
+  await loginFormRef.value.validate(async (valid) => {
+    if (!valid) return;
+
+    loading.value = true;
+    try {
+      const res = await adminLogin({
+        username: loginForm.username,
+        password: loginForm.password,
+      });
+
+      const token = res.data?.data?.token;
+      if (!token) {
+        ElMessage.error(res.data?.message || "登录失败");
+        return;
+      }
+
+      userStore.setToken(token, {
+        storage: rememberMe.value ? "local" : "session",
+        studioId: res.data?.data?.studioId,
+        role: res.data?.data?.role,
+        username: res.data?.data?.username,
+      });
+      ElMessage.success("欢迎回来");
+      router.push("/admin");
+    } finally {
+      loading.value = false;
+    }
+  });
+};
+</script>
+
 <template>
   <div class="login-container">
     <div class="login-card">
@@ -64,65 +123,6 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, reactive } from "vue";
-import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
-import { User, Lock, School } from "@element-plus/icons-vue";
-import { useUserStore } from "@/stores/user";
-import { adminLogin } from "@/api/admin";
-
-const router = useRouter();
-const userStore = useUserStore();
-
-const loginFormRef = ref(null);
-const loading = ref(false);
-const rememberMe = ref(false);
-
-const loginForm = reactive({
-  username: "",
-  password: "",
-});
-
-const loginRules = {
-  username: [{ required: true, message: "请填写账号", trigger: "blur" }],
-  password: [{ required: true, message: "请填写密码", trigger: "blur" }],
-};
-
-const handleLogin = async () => {
-  if (!loginFormRef.value) return;
-
-  await loginFormRef.value.validate(async (valid) => {
-    if (!valid) return;
-
-    loading.value = true;
-    try {
-      const res = await adminLogin({
-        username: loginForm.username,
-        password: loginForm.password,
-      });
-
-      const token = res.data?.data?.token;
-      if (!token) {
-        ElMessage.error(res.data?.message || "登录失败");
-        return;
-      }
-
-      userStore.setToken(token, {
-        storage: rememberMe.value ? "local" : "session",
-        studioId: res.data?.data?.studioId,
-        role: res.data?.data?.role,
-        username: res.data?.data?.username,
-      });
-      ElMessage.success("欢迎回来");
-      router.push("/admin");
-    } finally {
-      loading.value = false;
-    }
-  });
-};
-</script>
 
 <style lang="scss" scoped>
 .login-container {

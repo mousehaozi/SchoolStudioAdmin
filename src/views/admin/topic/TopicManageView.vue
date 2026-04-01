@@ -1,3 +1,187 @@
+<script setup>
+import { computed, onMounted, reactive, ref } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import {
+  Check,
+  Close,
+  Delete,
+  Edit,
+  Plus,
+  Refresh,
+  Sort,
+  Upload,
+} from "@element-plus/icons-vue";
+import {
+  createAdminIeTopic,
+  deleteAdminIeTopic,
+  getAdminIeTopics,
+  reorderAdminIeTopic,
+  setAdminIeTopicEnableStatus,
+  updateAdminIeTopic,
+  uploadAdminImage,
+} from "@/api/admin";
+
+const loading = ref(false);
+const saving = ref(false);
+const list = ref([]);
+
+const progressVisible = ref(false);
+const progress = ref(0);
+
+const dialogVisible = ref(false);
+const dialogMode = ref("create");
+const editingId = ref(null);
+
+const dialogTitle = computed(() =>
+  dialogMode.value === "create" ? "新增主题" : "编辑主题"
+);
+
+const formRef = ref(null);
+const form = reactive({
+  name: "",
+  description: "",
+  coverUrl: "",
+  sortNo: 0,
+  enableStatus: 1,
+});
+
+const enableSwitch = computed({
+  get() {
+    return form.enableStatus === 1;
+  },
+  set(v) {
+    form.enableStatus = v ? 1 : 0;
+  },
+});
+
+const rules = {
+  name: [{ required: true, message: "请填写名称", trigger: "blur" }],
+  description: [{ required: true, message: "请填写介绍", trigger: "blur" }],
+  coverUrl: [{ required: true, message: "请上传封面", trigger: "change" }],
+};
+
+function resetForm() {
+  form.name = "";
+  form.description = "";
+  form.coverUrl = "";
+  form.sortNo = 0;
+  form.enableStatus = 1;
+}
+
+async function fetchList() {
+  loading.value = true;
+  try {
+    const res = await getAdminIeTopics();
+    list.value = Array.isArray(res.data?.data) ? res.data.data : [];
+  } finally {
+    loading.value = false;
+  }
+}
+
+function openCreate() {
+  dialogMode.value = "create";
+  editingId.value = null;
+  resetForm();
+  dialogVisible.value = true;
+}
+
+function openEdit(row) {
+  dialogMode.value = "edit";
+  editingId.value = row.id;
+  form.name = row.name || "";
+  form.description = row.description || "";
+  form.coverUrl = row.coverUrl || "";
+  form.sortNo = row.sortNo ?? 0;
+  form.enableStatus = row.enableStatus ?? 1;
+  dialogVisible.value = true;
+}
+
+async function submit() {
+  if (!formRef.value) return;
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return;
+    saving.value = true;
+    try {
+      const payload = {
+        name: form.name,
+        description: form.description,
+        coverUrl: form.coverUrl,
+        sortNo: form.sortNo,
+        enableStatus: form.enableStatus,
+      };
+      if (dialogMode.value === "create") {
+        await createAdminIeTopic(payload);
+        ElMessage.success("已新增");
+      } else {
+        await updateAdminIeTopic(editingId.value, payload);
+        ElMessage.success("已保存");
+      }
+      dialogVisible.value = false;
+      await fetchList();
+    } finally {
+      saving.value = false;
+    }
+  });
+}
+
+async function toggleEnable(row, val) {
+  await setAdminIeTopicEnableStatus(row.id, val ? 1 : 0);
+  ElMessage.success("已更新启用状态");
+  await fetchList();
+}
+
+async function setSort(row) {
+  const { value } = await ElMessageBox.prompt(
+    "输入新的排序号(sortNo)",
+    "排序",
+    {
+      inputValue: String(row.sortNo ?? 0),
+      inputPattern: /^\d+$/,
+      inputErrorMessage: "请输入非负整数",
+    }
+  );
+  await reorderAdminIeTopic(row.id, Number(value));
+  ElMessage.success("已更新排序");
+  await fetchList();
+}
+
+async function removeRow(row) {
+  await ElMessageBox.confirm("确认删除该主题？", "提示", { type: "warning" });
+  await deleteAdminIeTopic(row.id);
+  ElMessage.success("已删除");
+  await fetchList();
+}
+
+async function customUpload(options) {
+  const file = options.file;
+  progressVisible.value = true;
+  progress.value = 0;
+
+  try {
+    const res = await uploadAdminImage(file, (p) => {
+      progress.value = p;
+    });
+
+    const url = res.data?.data?.url;
+    if (!url) {
+      ElMessage.error("上传失败：未返回url");
+      options.onError(new Error("missing url"));
+      return;
+    }
+
+    form.coverUrl = url;
+    ElMessage.success("上传成功");
+    options.onSuccess(res);
+  } catch (e) {
+    options.onError(e);
+  } finally {
+    progressVisible.value = false;
+  }
+}
+
+onMounted(fetchList);
+</script>
+
 <template>
   <div class="page">
     <CommonCard shadow="never" class="page-card">
@@ -20,7 +204,7 @@
         </div>
       </template>
 
-      <el-table :data="list" v-loading="loading" style="width: 100%">
+      <el-table v-loading="loading" :data="list" style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" align="center" />
         <el-table-column
           prop="name"
@@ -126,7 +310,7 @@
                 :percentage="progress"
                 style="max-width: 260px"
               />
-              <div class="cover-preview" v-if="form.coverUrl">
+              <div v-if="form.coverUrl" class="cover-preview">
                 <el-image
                   :src="form.coverUrl"
                   fit="cover"
@@ -169,190 +353,6 @@
     </el-dialog>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, reactive, ref } from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import {
-  Check,
-  Close,
-  Delete,
-  Edit,
-  Plus,
-  Refresh,
-  Sort,
-  Upload,
-} from "@element-plus/icons-vue";
-import {
-  createAdminIeTopic,
-  deleteAdminIeTopic,
-  getAdminIeTopics,
-  reorderAdminIeTopic,
-  setAdminIeTopicEnableStatus,
-  updateAdminIeTopic,
-  uploadAdminImage,
-} from "@/api/admin";
-
-const loading = ref(false);
-const saving = ref(false);
-const list = ref([]);
-
-const progressVisible = ref(false);
-const progress = ref(0);
-
-const dialogVisible = ref(false);
-const dialogMode = ref("create");
-const editingId = ref(null);
-
-const dialogTitle = computed(() =>
-  dialogMode.value === "create" ? "新增主题" : "编辑主题",
-);
-
-const formRef = ref(null);
-const form = reactive({
-  name: "",
-  description: "",
-  coverUrl: "",
-  sortNo: 0,
-  enableStatus: 1,
-});
-
-const enableSwitch = computed({
-  get() {
-    return form.enableStatus === 1;
-  },
-  set(v) {
-    form.enableStatus = v ? 1 : 0;
-  },
-});
-
-const rules = {
-  name: [{ required: true, message: "请填写名称", trigger: "blur" }],
-  description: [{ required: true, message: "请填写介绍", trigger: "blur" }],
-  coverUrl: [{ required: true, message: "请上传封面", trigger: "change" }],
-};
-
-function resetForm() {
-  form.name = "";
-  form.description = "";
-  form.coverUrl = "";
-  form.sortNo = 0;
-  form.enableStatus = 1;
-}
-
-async function fetchList() {
-  loading.value = true;
-  try {
-    const res = await getAdminIeTopics();
-    list.value = Array.isArray(res.data?.data) ? res.data.data : [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-function openCreate() {
-  dialogMode.value = "create";
-  editingId.value = null;
-  resetForm();
-  dialogVisible.value = true;
-}
-
-function openEdit(row) {
-  dialogMode.value = "edit";
-  editingId.value = row.id;
-  form.name = row.name || "";
-  form.description = row.description || "";
-  form.coverUrl = row.coverUrl || "";
-  form.sortNo = row.sortNo ?? 0;
-  form.enableStatus = row.enableStatus ?? 1;
-  dialogVisible.value = true;
-}
-
-async function submit() {
-  if (!formRef.value) return;
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return;
-    saving.value = true;
-    try {
-      const payload = {
-        name: form.name,
-        description: form.description,
-        coverUrl: form.coverUrl,
-        sortNo: form.sortNo,
-        enableStatus: form.enableStatus,
-      };
-      if (dialogMode.value === "create") {
-        await createAdminIeTopic(payload);
-        ElMessage.success("已新增");
-      } else {
-        await updateAdminIeTopic(editingId.value, payload);
-        ElMessage.success("已保存");
-      }
-      dialogVisible.value = false;
-      await fetchList();
-    } finally {
-      saving.value = false;
-    }
-  });
-}
-
-async function toggleEnable(row, val) {
-  await setAdminIeTopicEnableStatus(row.id, val ? 1 : 0);
-  ElMessage.success("已更新启用状态");
-  await fetchList();
-}
-
-async function setSort(row) {
-  const { value } = await ElMessageBox.prompt(
-    "输入新的排序号(sortNo)",
-    "排序",
-    {
-      inputValue: String(row.sortNo ?? 0),
-      inputPattern: /^\d+$/,
-      inputErrorMessage: "请输入非负整数",
-    },
-  );
-  await reorderAdminIeTopic(row.id, Number(value));
-  ElMessage.success("已更新排序");
-  await fetchList();
-}
-
-async function removeRow(row) {
-  await ElMessageBox.confirm("确认删除该主题？", "提示", { type: "warning" });
-  await deleteAdminIeTopic(row.id);
-  ElMessage.success("已删除");
-  await fetchList();
-}
-
-async function customUpload(options) {
-  const file = options.file;
-  progressVisible.value = true;
-  progress.value = 0;
-
-  try {
-    const res = await uploadAdminImage(file, (p) => {
-      progress.value = p;
-    });
-
-    const url = res.data?.data?.url;
-    if (!url) {
-      ElMessage.error("上传失败：未返回url");
-      options.onError(new Error("missing url"));
-      return;
-    }
-
-    form.coverUrl = url;
-    ElMessage.success("上传成功");
-    options.onSuccess(res);
-  } catch (e) {
-    options.onError(e);
-  } finally {
-    progressVisible.value = false;
-  }
-}
-
-onMounted(fetchList);
-</script>
 
 <style scoped>
 .page-header {

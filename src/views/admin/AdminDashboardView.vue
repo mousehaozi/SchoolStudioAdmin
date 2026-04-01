@@ -1,3 +1,5 @@
+<script setup></script>
+
 <template>
   <div class="page">
     <CommonCard shadow="never" class="page-card">
@@ -8,8 +10,6 @@
     </CommonCard>
   </div>
 </template>
-
-<script setup></script>
 
 <style scoped>
 .page {

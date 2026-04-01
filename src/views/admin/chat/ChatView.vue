@@ -1,247 +1,5 @@
-<template>
-  <div class="page chat-page">
-    <CommonCard
-      shadow="never"
-      class="page-card chat-wrapper"
-      body-style="padding: 0; height: 100%; display: flex; overflow: hidden;"
-    >
-      <!-- 左侧：会话列表 -->
-      <div class="session-sidebar">
-        <div class="sidebar-header">
-          <div class="sidebar-title">消息中心</div>
-          <div class="sidebar-tabs">
-            <div
-              v-for="tab in tabs"
-              :key="tab.value"
-              class="tab-item"
-              :class="{ active: currentTab === tab.value }"
-              @click="handleTabChange(tab.value)"
-            >
-              {{ tab.label }}
-            </div>
-          </div>
-        </div>
-
-        <div class="session-list" v-loading="loadingSessions">
-          <div
-            v-for="session in sessions"
-            :key="session.id"
-            class="session-item"
-            :class="{ active: currentSession?.id === session.id }"
-            @click="selectSession(session)"
-          >
-            <el-badge
-              :value="session.unreadCount"
-              :hidden="!session.unreadCount || session.unreadCount === 0"
-              class="badge-item"
-            >
-              <el-avatar
-                :size="48"
-                :src="session.wechatAvatar || defaultAvatar"
-              />
-            </el-badge>
-            <div class="session-info">
-              <div class="session-top">
-                <span class="user-name">{{
-                  session.wechatNickname || "匿名用户"
-                }}</span>
-                <span class="time">{{
-                  formatTime(session.lastMessageSentAt, "YYYY-MM-DD HH:mm")
-                }}</span>
-              </div>
-              <div class="session-bottom">
-                <span class="last-msg">{{
-                  session.lastMessageContent || "[新会话]"
-                }}</span>
-                <el-tag
-                  size="small"
-                  :type="getStatusType(session.status)"
-                  effect="plain"
-                >
-                  {{ getStatusText(session.status) }}
-                </el-tag>
-              </div>
-            </div>
-          </div>
-          <el-empty v-if="sessions.length === 0" description="暂无会话" />
-        </div>
-      </div>
-
-      <!-- 右侧：聊天窗口 -->
-      <div class="chat-container">
-        <AnimatePresence mode="wait">
-          <Motion
-            v-if="currentSession"
-            :key="currentSession.id"
-            as="div"
-            class="chat-main"
-            :initial="{ opacity: 0, x: 10 }"
-            :animate="{ opacity: 1, x: 0 }"
-            :exit="{ opacity: 0, x: -10 }"
-            :transition="{ duration: 0.2 }"
-          >
-            <div class="chat-header">
-              <div class="header-user">
-                <el-avatar
-                  :size="40"
-                  :src="currentSession.wechatAvatar || defaultAvatar"
-                />
-                <div class="user-meta">
-                  <div class="name">
-                    {{ currentSession.wechatNickname || "未知用户" }}
-                  </div>
-                </div>
-              </div>
-              <div class="header-actions">
-                <el-button
-                  v-if="currentSession.status !== 2"
-                  type="danger"
-                  plain
-                  size="small"
-                  :icon="CircleClose"
-                  @click="handleCloseSession"
-                  >结束会话</el-button
-                >
-              </div>
-            </div>
-
-            <div
-              class="message-list"
-              ref="messageListRef"
-              @scroll="handleScroll"
-            >
-              <div v-if="loadingMessages && hasMoreMessages" class="load-more">
-                <el-icon class="is-loading"><Loading /></el-icon>
-              </div>
-
-              <AnimatePresence>
-                <template v-for="(msg, index) in messages" :key="msg.id">
-                  <!-- 对话中间中心显示：每一小时分割一次 -->
-                  <div
-                    v-if="shouldShowDivider(msg, index)"
-                    class="message-divider"
-                  >
-                    {{ formatTime(msg.sentAt, "YYYY-MM-DD HH:mm:ss") }}
-                  </div>
-
-                  <Motion
-                    as="div"
-                    class="message-wrapper"
-                    :class="{ 'is-me': isAdminMessage(msg) }"
-                    :initial="{ opacity: 0, y: 15, scale: 0.98 }"
-                    :animate="{ opacity: 1, y: 0, scale: 1 }"
-                    :transition="{
-                      type: 'spring',
-                      damping: 25,
-                      stiffness: 400,
-                    }"
-                  >
-                    <el-avatar
-                      class="msg-avatar"
-                      :size="36"
-                      :src="
-                        isAdminMessage(msg)
-                          ? adminAvatar
-                          : currentSession.wechatAvatar || defaultAvatar
-                      "
-                    />
-                    <div class="msg-content-box">
-                      <div class="msg-bubble">
-                        <template v-if="msg.msgType === 'TEXT'">
-                          {{ msg.content }}
-                        </template>
-                        <template v-else-if="msg.msgType === 'IMAGE'">
-                          <el-image
-                            :src="msg.content"
-                            :preview-src-list="[msg.content]"
-                            fit="cover"
-                            class="msg-image"
-                          />
-                        </template>
-                      </div>
-                      <!-- 气泡下方显示时间 时分秒 + 已读未读 -->
-                      <div class="msg-footer">
-                        <span class="msg-time">{{
-                          formatTime(msg.sentAt, "HH:mm:ss")
-                        }}</span>
-                        <span
-                          v-if="isAdminMessage(msg)"
-                          class="read-status"
-                          :class="{ 'is-read': msg.readStatus === 1 }"
-                        >
-                          {{ msg.readStatus === 1 ? "已读" : "未读" }}
-                        </span>
-                      </div>
-                    </div>
-                  </Motion>
-                </template>
-              </AnimatePresence>
-            </div>
-
-            <div class="chat-input" v-if="currentSession.status !== 2">
-              <div class="input-tools">
-                <el-upload
-                  action="#"
-                  :auto-upload="false"
-                  :show-file-list="false"
-                  accept="image/*"
-                  @change="handleImageUpload"
-                >
-                  <el-button :icon="Picture" circle plain />
-                </el-upload>
-              </div>
-              <div class="input-area">
-                <el-input
-                  v-model="inputText"
-                  type="textarea"
-                  :rows="3"
-                  resize="none"
-                  placeholder="请输入回复内容..."
-                  @keyup.enter.exact.prevent="handleSend"
-                />
-                <div class="input-footer">
-                  <span class="hint">Enter 发送</span>
-                  <el-button
-                    type="primary"
-                    :disabled="!inputText.trim()"
-                    @click="handleSend"
-                    >发送</el-button
-                  >
-                </div>
-              </div>
-            </div>
-            <div class="session-closed-notice" v-else>该会话已结束</div>
-          </Motion>
-          <Motion
-            v-else
-            key="empty"
-            as="div"
-            class="empty-chat"
-            :initial="{ opacity: 0, scale: 0.95 }"
-            :animate="{ opacity: 1, scale: 1 }"
-            :exit="{ opacity: 0, scale: 0.95 }"
-            :transition="{ duration: 0.2 }"
-          >
-            <div class="chat-placeholder">
-              <el-icon :size="80"><ChatDotRound /></el-icon>
-              <p>请选择左侧会话开始交流</p>
-            </div>
-          </Motion>
-        </AnimatePresence>
-      </div>
-    </CommonCard>
-  </div>
-</template>
-
 <script setup>
-import {
-  ref,
-  reactive,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-  nextTick,
-} from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Picture,
@@ -249,7 +7,7 @@ import {
   ChatDotRound,
   Loading,
 } from "@element-plus/icons-vue";
-import { Motion, AnimatePresence, LayoutGroup } from "motion-v";
+import { Motion, AnimatePresence } from "motion-v";
 import { useUserStore } from "@/stores/user";
 import {
   getAdminChatSessions,
@@ -381,7 +139,7 @@ const handleSend = async () => {
     }
     // 消息会通过 WebSocket 实时更新，不需要在这里手动 push
     // 但为了体验顺滑，也可以先 push 一个临时的，WebSocket 收到后再替换或去重
-  } catch (err) {
+  } catch {
     ElMessage.error("发送失败");
   }
 };
@@ -420,7 +178,7 @@ const handleCloseSession = async () => {
     ElMessage.success("会话已关闭");
     currentSession.value.status = 2;
     fetchSessions();
-  } catch (err) {
+  } catch {
     // cancel or error
   }
 };
@@ -589,6 +347,241 @@ onBeforeUnmount(() => {
   }
 });
 </script>
+
+<template>
+  <div class="page chat-page">
+    <CommonCard
+      shadow="never"
+      class="page-card chat-wrapper"
+      body-style="padding: 0; height: 100%; display: flex; overflow: hidden;"
+    >
+      <!-- 左侧：会话列表 -->
+      <div class="session-sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">消息中心</div>
+          <div class="sidebar-tabs">
+            <div
+              v-for="tab in tabs"
+              :key="tab.value"
+              class="tab-item"
+              :class="{ active: currentTab === tab.value }"
+              @click="handleTabChange(tab.value)"
+            >
+              {{ tab.label }}
+            </div>
+          </div>
+        </div>
+
+        <div v-loading="loadingSessions" class="session-list">
+          <div
+            v-for="session in sessions"
+            :key="session.id"
+            class="session-item"
+            :class="{ active: currentSession?.id === session.id }"
+            @click="selectSession(session)"
+          >
+            <el-badge
+              :value="session.unreadCount"
+              :hidden="!session.unreadCount || session.unreadCount === 0"
+              class="badge-item"
+            >
+              <el-avatar
+                :size="48"
+                :src="session.wechatAvatar || defaultAvatar"
+              />
+            </el-badge>
+            <div class="session-info">
+              <div class="session-top">
+                <span class="user-name">{{
+                  session.wechatNickname || "匿名用户"
+                }}</span>
+                <span class="time">{{
+                  formatTime(session.lastMessageSentAt, "YYYY-MM-DD HH:mm")
+                }}</span>
+              </div>
+              <div class="session-bottom">
+                <span class="last-msg">{{
+                  session.lastMessageContent || "[新会话]"
+                }}</span>
+                <el-tag
+                  size="small"
+                  :type="getStatusType(session.status)"
+                  effect="plain"
+                >
+                  {{ getStatusText(session.status) }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+          <el-empty v-if="sessions.length === 0" description="暂无会话" />
+        </div>
+      </div>
+
+      <!-- 右侧：聊天窗口 -->
+      <div class="chat-container">
+        <AnimatePresence mode="wait">
+          <Motion
+            v-if="currentSession"
+            :key="currentSession.id"
+            as="div"
+            class="chat-main"
+            :initial="{ opacity: 0, x: 10 }"
+            :animate="{ opacity: 1, x: 0 }"
+            :exit="{ opacity: 0, x: -10 }"
+            :transition="{ duration: 0.2 }"
+          >
+            <div class="chat-header">
+              <div class="header-user">
+                <el-avatar
+                  :size="40"
+                  :src="currentSession.wechatAvatar || defaultAvatar"
+                />
+                <div class="user-meta">
+                  <div class="name">
+                    {{ currentSession.wechatNickname || "未知用户" }}
+                  </div>
+                </div>
+              </div>
+              <div class="header-actions">
+                <el-button
+                  v-if="currentSession.status !== 2"
+                  type="danger"
+                  plain
+                  size="small"
+                  :icon="CircleClose"
+                  @click="handleCloseSession"
+                  >结束会话</el-button
+                >
+              </div>
+            </div>
+
+            <div
+              ref="messageListRef"
+              class="message-list"
+              @scroll="handleScroll"
+            >
+              <div v-if="loadingMessages && hasMoreMessages" class="load-more">
+                <el-icon class="is-loading"><Loading /></el-icon>
+              </div>
+
+              <AnimatePresence>
+                <template v-for="(msg, index) in messages" :key="msg.id">
+                  <!-- 对话中间中心显示：每一小时分割一次 -->
+                  <div
+                    v-if="shouldShowDivider(msg, index)"
+                    class="message-divider"
+                  >
+                    {{ formatTime(msg.sentAt, "YYYY-MM-DD HH:mm:ss") }}
+                  </div>
+
+                  <Motion
+                    as="div"
+                    class="message-wrapper"
+                    :class="{ 'is-me': isAdminMessage(msg) }"
+                    :initial="{ opacity: 0, y: 15, scale: 0.98 }"
+                    :animate="{ opacity: 1, y: 0, scale: 1 }"
+                    :transition="{
+                      type: 'spring',
+                      damping: 25,
+                      stiffness: 400,
+                    }"
+                  >
+                    <el-avatar
+                      class="msg-avatar"
+                      :size="36"
+                      :src="
+                        isAdminMessage(msg)
+                          ? adminAvatar
+                          : currentSession.wechatAvatar || defaultAvatar
+                      "
+                    />
+                    <div class="msg-content-box">
+                      <div class="msg-bubble">
+                        <template v-if="msg.msgType === 'TEXT'">
+                          {{ msg.content }}
+                        </template>
+                        <template v-else-if="msg.msgType === 'IMAGE'">
+                          <el-image
+                            :src="msg.content"
+                            :preview-src-list="[msg.content]"
+                            fit="cover"
+                            class="msg-image"
+                          />
+                        </template>
+                      </div>
+                      <!-- 气泡下方显示时间 时分秒 + 已读未读 -->
+                      <div class="msg-footer">
+                        <span class="msg-time">{{
+                          formatTime(msg.sentAt, "HH:mm:ss")
+                        }}</span>
+                        <span
+                          v-if="isAdminMessage(msg)"
+                          class="read-status"
+                          :class="{ 'is-read': msg.readStatus === 1 }"
+                        >
+                          {{ msg.readStatus === 1 ? "已读" : "未读" }}
+                        </span>
+                      </div>
+                    </div>
+                  </Motion>
+                </template>
+              </AnimatePresence>
+            </div>
+
+            <div v-if="currentSession.status !== 2" class="chat-input">
+              <div class="input-tools">
+                <el-upload
+                  action="#"
+                  :auto-upload="false"
+                  :show-file-list="false"
+                  accept="image/*"
+                  @change="handleImageUpload"
+                >
+                  <el-button :icon="Picture" circle plain />
+                </el-upload>
+              </div>
+              <div class="input-area">
+                <el-input
+                  v-model="inputText"
+                  type="textarea"
+                  :rows="3"
+                  resize="none"
+                  placeholder="请输入回复内容..."
+                  @keyup.enter.exact.prevent="handleSend"
+                />
+                <div class="input-footer">
+                  <span class="hint">Enter 发送</span>
+                  <el-button
+                    type="primary"
+                    :disabled="!inputText.trim()"
+                    @click="handleSend"
+                    >发送</el-button
+                  >
+                </div>
+              </div>
+            </div>
+            <div v-else class="session-closed-notice">该会话已结束</div>
+          </Motion>
+          <Motion
+            v-else
+            key="empty"
+            as="div"
+            class="empty-chat"
+            :initial="{ opacity: 0, scale: 0.95 }"
+            :animate="{ opacity: 1, scale: 1 }"
+            :exit="{ opacity: 0, scale: 0.95 }"
+            :transition="{ duration: 0.2 }"
+          >
+            <div class="chat-placeholder">
+              <el-icon :size="80"><ChatDotRound /></el-icon>
+              <p>请选择左侧会话开始交流</p>
+            </div>
+          </Motion>
+        </AnimatePresence>
+      </div>
+    </CommonCard>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .chat-page {

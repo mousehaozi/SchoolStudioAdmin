@@ -26,11 +26,11 @@ request.interceptors.response.use(
       userStore.logout();
       router.push("/login");
       ElMessage.error(
-        error.response.data?.message || "token无效或已过期，请重新登录",
+        error.response.data?.message || "token无效或已过期，请重新登录"
       );
     }
     return Promise.reject(error);
-  },
+  }
 );
 
 export default request;
