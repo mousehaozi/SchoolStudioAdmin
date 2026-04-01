@@ -127,7 +127,7 @@
                   <Motion
                     as="div"
                     class="message-wrapper"
-                    :class="{ 'is-me': msg.senderRole === 'ADMIN' }"
+                    :class="{ 'is-me': isAdminMessage(msg) }"
                     :initial="{ opacity: 0, y: 15, scale: 0.98 }"
                     :animate="{ opacity: 1, y: 0, scale: 1 }"
                     :transition="{
@@ -140,7 +140,7 @@
                       class="msg-avatar"
                       :size="36"
                       :src="
-                        msg.senderRole === 'ADMIN'
+                        isAdminMessage(msg)
                           ? adminAvatar
                           : currentSession.wechatAvatar || defaultAvatar
                       "
@@ -165,7 +165,7 @@
                           formatTime(msg.sentAt, "HH:mm:ss")
                         }}</span>
                         <span
-                          v-if="msg.senderRole === 'ADMIN'"
+                          v-if="isAdminMessage(msg)"
                           class="read-status"
                           :class="{ 'is-read': msg.readStatus === 1 }"
                         >
@@ -266,6 +266,7 @@ const defaultAvatar =
   "https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png";
 const adminAvatar =
   "https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png";
+const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
 
 // --- 会话列表控制 ---
 const currentTab = ref("");
@@ -278,6 +279,10 @@ const tabs = [
 const sessions = ref([]);
 const loadingSessions = ref(false);
 const currentSession = ref(null);
+
+const isAdminRole = (role) => ADMIN_ROLES.has(role);
+const isAdminMessage = (msg) => isAdminRole(msg?.senderRole);
+const isUserMessage = (msg) => msg?.senderRole === "USER";
 
 const fetchSessions = async () => {
   loadingSessions.value = true;
@@ -478,7 +483,7 @@ const handleIncomingMessage = (msg) => {
       messages.value.push(msg);
       scrollToBottom();
       // 自动标为已读
-      if (msg.senderRole === "USER") {
+      if (isUserMessage(msg)) {
         markAdminChatRead(msg.sessionId);
       }
     }
@@ -493,17 +498,14 @@ const handleIncomingMessage = (msg) => {
     session.lastMessageSentAt = msg.sentAt;
 
     // 如果管理员回复，且会话原状态为待接待(0)，自动同步为交流中(1)
-    if (msg.senderRole === "ADMIN" && session.status === 0) {
+    if (isAdminMessage(msg) && session.status === 0) {
       session.status = 1;
       if (currentSession.value?.id === session.id) {
         currentSession.value.status = 1;
       }
     }
 
-    if (
-      currentSession.value?.id !== msg.sessionId &&
-      msg.senderRole === "USER"
-    ) {
+    if (currentSession.value?.id !== msg.sessionId && isUserMessage(msg)) {
       session.unreadCount = (session.unreadCount || 0) + 1;
     }
     // 将其移动到列表首位
@@ -527,7 +529,7 @@ const handleReadReceipt = (payload) => {
     messages.value.forEach((msg) => {
       // 找到所有 ADMIN 发送的，且发送时间早于等于 readAt 的消息，标记为已读
       if (
-        msg.senderRole === "ADMIN" &&
+        isAdminMessage(msg) &&
         new Date(msg.sentAt).getTime() <= new Date(readAt).getTime()
       ) {
         msg.readStatus = 1;
