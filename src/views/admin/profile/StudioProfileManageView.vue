@@ -245,6 +245,21 @@ const handleCreated = (editor) => {
   editorRef.value = editor;
 };
 
+function normalizeContentHtml(html) {
+  if (!html) return "";
+
+  return html.replace(
+    /(<[a-z][^>]*?)\sstyle=(["'])(.*?)\2([^>]*>)/gi,
+    (match, start, quote, style, end) => {
+      const newStyle = style.replace(/text-indent:\s*[^;]+;?/gi, "").trim();
+
+      return newStyle
+        ? `${start} style=${quote}${newStyle}${quote}${end}`
+        : `${start}${end}`;
+    }
+  );
+}
+
 onBeforeUnmount(() => {
   const editor = editorRef.value;
   if (editor == null) return;
@@ -331,7 +346,7 @@ function openOverwrite() {
   if (currentProfile.value) {
     form.title = currentProfile.value.title || "";
     form.coverUrl = currentProfile.value.coverUrl || "";
-    form.contentHtml = currentProfile.value.contentHtml || "";
+    form.contentHtml = normalizeContentHtml(currentProfile.value.contentHtml);
     form.enableStatus = currentProfile.value.enableStatus ?? 1;
     form.leaderName = currentProfile.value.leaderName || "";
     form.leaderIntro = currentProfile.value.leaderIntro || "";
@@ -366,30 +381,7 @@ async function submit() {
     try {
       const { studioId, ...restForm } = form;
 
-      // 清理富文本内容中图片关联的缩进和两端对齐样式
-      let cleanContentHtml = restForm.contentHtml;
-      cleanContentHtml = cleanContentHtml.replace(
-        /<p([^>]*)style="([^"]*)"([^>]*)>(\s*<img[^>]+>\s*)<\/p>/gi,
-        (match, p1, style, p3, imgContent) => {
-          let newStyle = style
-            .replace(/text-indent:\s*[^;]+;?/gi, "")
-            .replace(/text-align:\s*justify;?/gi, "")
-            .trim();
-          let styleAttr = newStyle ? ` style="${newStyle}"` : "";
-          return `<p${p1}${styleAttr}${p3}>${imgContent}</p>`;
-        }
-      );
-      cleanContentHtml = cleanContentHtml.replace(
-        /(<img[^>]*)style="([^"]*)"([^>]*>)/gi,
-        (match, p1, style, p3) => {
-          let newStyle = style
-            .replace(/text-indent:\s*[^;]+;?/gi, "")
-            .replace(/text-align:\s*justify;?/gi, "")
-            .trim();
-          let styleAttr = newStyle ? ` style="${newStyle}"` : "";
-          return `${p1}${styleAttr}${p3}`;
-        }
-      );
+      const cleanContentHtml = normalizeContentHtml(restForm.contentHtml);
 
       await overwriteAdminCurrentStudioProfile(
         {
@@ -487,10 +479,14 @@ onMounted(fetchList);
             <!-- 核心详情 -->
             <section class="info-section">
               <el-divider content-position="left">简介内容</el-divider>
-              <div
-                class="profile-content ql-snow"
-                v-html="getResourceHtml(currentProfile.contentHtml)"
-              ></div>
+              <div class="profile-content w-e-text-container">
+                <div class="w-e-scroll">
+                  <div
+                    data-slate-editor
+                    v-html="getResourceHtml(currentProfile.contentHtml)"
+                  ></div>
+                </div>
+              </div>
             </section>
 
             <!-- 详细资料网格 -->
@@ -1077,13 +1073,6 @@ onMounted(fetchList);
   font-style: italic;
 }
 
-.profile-content {
-  line-height: 1.8;
-  color: #444;
-  padding: 4px 0;
-  word-break: break-word;
-}
-
 .metadata-grid {
   row-gap: 20px;
 }
@@ -1112,12 +1101,22 @@ onMounted(fetchList);
   line-height: 1.4;
 }
 
+.profile-content {
+  height: auto;
+}
+
+.profile-content :deep(.w-e-scroll) {
+  height: auto;
+}
+
+.profile-content :deep([data-slate-editor]) {
+  min-height: 0;
+}
+
 .profile-content :deep(img),
 .profile-content :deep(video),
 .profile-content :deep(iframe) {
   max-width: 100%;
-  border-radius: 8px;
-  margin: 10px 0;
 }
 
 /* Ensure editor content itself makes media responsive */
