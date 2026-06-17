@@ -27,8 +27,10 @@ export function getResourceUrl(url) {
 export function getResourceHtml(html) {
   if (!html) return html;
 
-  return html.replace(
-    /(<img\b[^>]*?\bsrc=["'])([^"']+)(["'][^>]*>)/gi,
-    (_, prefix, url, suffix) => `${prefix}${getResourceUrl(url)}${suffix}`
+  return html.replace(/<(img|video|source|iframe)\b[^>]*>/gi, (tag) =>
+    tag.replace(
+      /\b(src|poster)=(["'])([^"']*)\2/gi,
+      (_, attr, quote, url) => `${attr}=${quote}${getResourceUrl(url)}${quote}`
+    )
   );
 }

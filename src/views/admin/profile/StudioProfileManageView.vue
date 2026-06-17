@@ -175,7 +175,7 @@ async function customUploadCover(options) {
 const editorRef = shallowRef();
 const mode = "default";
 const toolbarConfig = {
-  // excludeKeys: ["group-video"], // Remove upload video menu
+  excludeKeys: ["fullScreen"],
 };
 const editorConfig = {
   placeholder: "请输入内容...",
@@ -460,7 +460,7 @@ onMounted(fetchList);
         </div>
       </template>
 
-      <div v-loading="loading">
+      <div v-loading="loading" class="profile-preview-area">
         <div v-if="currentProfile" class="profile-detail">
           <div class="profile-header">
             <el-image
@@ -630,14 +630,13 @@ onMounted(fetchList);
 
     <el-dialog
       v-model="dialogVisible"
+      class="profile-edit-dialog"
       title="编辑当前简介"
-      width="960px"
+      width="50%"
       destroy-on-close
       align-center
-      top="5vh"
-      fullscreen
     >
-      <div style="padding-right: 10px; padding-bottom: 20px">
+      <div class="profile-edit-dialog-body">
         <el-form ref="formRef" :model="form" :rules="rules" label-width="96px">
           <el-form-item label="标题" prop="title">
             <el-input v-model="form.title" placeholder="请输入页面标题" />
@@ -782,15 +781,16 @@ onMounted(fetchList);
           </el-form-item>
           <el-form-item label="内容简介" prop="contentHtml">
             <div
+              class="profile-editor"
               style="
                 border: 1px solid #ccc;
-                width: 100%;
                 border-radius: 4px;
                 position: relative;
                 z-index: 99;
               "
             >
               <Toolbar
+                class="profile-editor-toolbar"
                 style="border-bottom: 1px solid #ccc"
                 :editor="editorRef"
                 :default-config="toolbarConfig"
@@ -798,7 +798,7 @@ onMounted(fetchList);
               />
               <Editor
                 v-model="form.contentHtml"
-                style="height: 400px; overflow-y: hidden"
+                class="profile-editor-content"
                 :default-config="editorConfig"
                 :mode="mode"
                 @on-created="handleCreated"
@@ -843,17 +843,67 @@ onMounted(fetchList);
   gap: 8px;
 }
 
+.profile-preview-area {
+  height: 100%;
+  min-height: 560px;
+  padding: 0px;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+:deep(.profile-edit-dialog) {
+  height: min(90vh, 920px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:deep(.profile-edit-dialog .el-dialog__body) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+:deep(.profile-edit-dialog .el-dialog__footer) {
+  flex-shrink: 0;
+  padding-top: 14px;
+  border-top: 1px solid #ebeef5;
+  background: #ffffff;
+}
+
+.profile-edit-dialog-body {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .profile-detail {
-  padding: 0 10px 20px;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+  flex: 0 0 auto;
+  margin: 0 auto;
+  padding: 18px 14px 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #ffffff;
+  border: 1px solid #e5eaf3;
+  border-radius: 28px;
+  box-shadow: 0 18px 45px rgba(20, 40, 80, 0.12);
 }
 
 .profile-header {
   display: flex;
-  gap: 32px;
-  margin-bottom: 32px;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
   background: linear-gradient(135deg, #ffffff 0%, #f9fbff 100%);
-  padding: 32px;
-  border-radius: 16px;
+  padding: 14px;
+  border-radius: 14px;
   border: 1px solid #f0f3f8;
 }
 
@@ -865,8 +915,9 @@ onMounted(fetchList);
 }
 
 .profile-cover {
-  width: 280px;
-  height: 157px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
   border-radius: 12px;
   border: 1px solid #ebeef5;
   flex-shrink: 0;
@@ -882,21 +933,22 @@ onMounted(fetchList);
 
 .profile-info h2 {
   margin: 0;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 700;
   color: #1a1a1a;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
+  line-height: 1.35;
 }
 
 .profile-meta {
   color: #909399;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .profile-sections {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 20px;
 }
 
 .info-section {
@@ -905,8 +957,8 @@ onMounted(fetchList);
 
 .info-card {
   background: #f8fafc;
-  padding: 20px;
-  border-radius: 12px;
+  padding: 14px;
+  border-radius: 10px;
   border: 1px solid #edf2f7;
   height: 100%;
 }
@@ -931,7 +983,7 @@ onMounted(fetchList);
 .side-value {
   color: #2d3748;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .intro-text {
@@ -948,10 +1000,18 @@ onMounted(fetchList);
   align-content: flex-start;
 }
 
+.tag-group :deep(.el-tag) {
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  line-height: 1.4;
+  padding: 4px 8px;
+}
+
 .contact-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 .contact-card {
@@ -990,7 +1050,7 @@ onMounted(fetchList);
 
 .detail-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   color: #4a5568;
   font-size: 14px;
@@ -1020,13 +1080,36 @@ onMounted(fetchList);
 .profile-content {
   line-height: 1.8;
   color: #444;
-  padding: 10px;
+  padding: 4px 0;
+  word-break: break-word;
+}
+
+.metadata-grid {
+  row-gap: 20px;
+}
+
+.metadata-grid :deep(.el-col) {
+  flex: 0 0 100%;
+  max-width: 100%;
 }
 
 .wechat-link {
   color: #67c23a;
-  word-break: break-all;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 13px;
+}
+
+.profile-detail :deep(.el-divider) {
+  margin: 14px 0;
+}
+
+.profile-detail :deep(.el-divider__text) {
+  max-width: calc(100% - 40px);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .profile-content :deep(img),
@@ -1046,6 +1129,42 @@ onMounted(fetchList);
 
 :deep([data-w-e-type="video"]) {
   max-width: 100%;
+}
+
+.profile-editor {
+  width: 70%;
+  aspect-ratio: 9 / 16;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.profile-editor-toolbar {
+  flex-shrink: 0;
+}
+
+.profile-editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: hidden;
+}
+
+@media (max-width: 900px) {
+  .profile-preview-area {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .profile-detail {
+    width: 100%;
+    height: auto;
+    min-height: min(720px, calc(100vh - 180px));
+  }
+
+  .profile-editor {
+    width: 100%;
+  }
 }
 
 .cover-uploader {
