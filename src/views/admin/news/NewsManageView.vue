@@ -119,6 +119,9 @@ const enableSwitch = computed({
 const rules = {
   title: [{ required: true, message: "请填写标题", trigger: "blur" }],
   contentHtml: [{ required: true, message: "请填写内容", trigger: "blur" }],
+  studioId: [
+    { required: true, message: "请选择所属工作室", trigger: "change" },
+  ],
 };
 
 function resetForm() {
@@ -201,6 +204,7 @@ async function submit() {
         contentHtml: form.contentHtml,
         publishStatus: 0,
         enableStatus: form.enableStatus,
+        studioId: form.studioId,
       };
 
       if (dialogMode.value === "create") {
