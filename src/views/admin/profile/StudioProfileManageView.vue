@@ -198,7 +198,7 @@ const editorConfig = {
           });
           const url = res.data?.data?.url;
           if (url) {
-            insertFn(url, "image", url);
+            insertFn(getResourceUrl(url), "image", url);
             ElMessage.success("图片上传成功");
           } else {
             ElMessage.error("图片上传失败");
@@ -346,7 +346,7 @@ function openOverwrite() {
   if (currentProfile.value) {
     form.title = currentProfile.value.title || "";
     form.coverUrl = currentProfile.value.coverUrl || "";
-    form.contentHtml = normalizeContentHtml(currentProfile.value.contentHtml);
+    form.contentHtml = getResourceHtml(currentProfile.value.contentHtml);
     form.enableStatus = currentProfile.value.enableStatus ?? 1;
     form.leaderName = currentProfile.value.leaderName || "";
     form.leaderIntro = currentProfile.value.leaderIntro || "";
