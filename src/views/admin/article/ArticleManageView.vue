@@ -30,7 +30,7 @@ import {
   updateAdminIeArticle,
   uploadAdminImage,
 } from "@/api/admin";
-import { getResourceUrl } from "@/utils/baseUrl";
+import { getResourceHtml, getResourceUrl } from "@/utils/baseUrl";
 
 const loading = ref(false);
 const saving = ref(false);
@@ -72,7 +72,7 @@ const editorConfig = {
           const res = await uploadAdminImage(file);
           const url = res.data?.data?.url;
           if (url) {
-            insertFn(url, "image", url);
+            insertFn(getResourceUrl(url), "image", url);
           } else {
             ElMessage.error("图片上传失败");
           }
@@ -175,7 +175,7 @@ function openEdit(row) {
   form.author = row.author || "";
   form.tags = row.tags ? row.tags.split(",").filter(Boolean) : [];
   form.coverUrl = row.coverUrl || "";
-  form.contentHtml = row.contentHtml || "";
+  form.contentHtml = getResourceHtml(row.contentHtml || "");
   form.enableStatus = row.enableStatus ?? 1;
   dialogVisible.value = true;
 }
