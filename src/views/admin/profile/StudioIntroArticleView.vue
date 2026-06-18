@@ -29,7 +29,7 @@ import {
   uploadAdminImage,
   getAdminStudios,
 } from "@/api/admin";
-import { getResourceUrl } from "@/utils/baseUrl";
+import { getResourceHtml, getResourceUrl } from "@/utils/baseUrl";
 
 const userStore = useUserStore();
 const loading = ref(false);
@@ -54,7 +54,7 @@ const editorConfig = {
         try {
           const res = await uploadAdminImage(file);
           const url = res.data?.data?.url;
-          if (url) insertFn(url, "image", url);
+          if (url) insertFn(getResourceUrl(url), "image", url);
           else ElMessage.error("图片上传失败");
         } catch (e) {
           console.error(e);
@@ -175,7 +175,7 @@ function openEdit(row) {
   form.title = row.title;
   form.coverUrl = row.coverUrl;
   form.summary = row.summary;
-  form.contentHtml = row.contentHtml;
+  form.contentHtml = getResourceHtml(row.contentHtml);
   form.sortNo = row.sortNo;
   form.enableStatus = row.enableStatus;
   form.studioId = row.studioId; // mainly for display if useful? API update doesn't usually change studioId
