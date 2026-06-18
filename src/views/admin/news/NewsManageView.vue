@@ -1,3 +1,283 @@
+<script setup>
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  shallowRef,
+} from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import {
+  Check,
+  Close,
+  Delete,
+  Edit,
+  Plus,
+  Promotion,
+  Refresh,
+  Search,
+  Upload,
+} from "@element-plus/icons-vue";
+import { Editor, Toolbar } from "@wangeditor/editor-for-vue";
+import "@wangeditor/editor/dist/css/style.css";
+import {
+  createAdminStudioNews,
+  deleteAdminStudioNews,
+  getAdminStudioNewsPage,
+  setAdminStudioNewsEnableStatus,
+  setAdminStudioNewsPublishStatus,
+  updateAdminStudioNews,
+  uploadAdminImage,
+  getAdminStudios,
+} from "@/api/admin";
+import { getResourceHtml, getResourceUrl } from "@/utils/baseUrl";
+
+const loading = ref(false);
+const saving = ref(false);
+
+const total = ref(0);
+const records = ref([]);
+const studioList = ref([]);
+const studioMap = ref({});
+
+const page = ref(1);
+const size = ref(10);
+const filters = reactive({ keyword: "", tags: "" });
+
+const progressVisible = ref(false);
+const progress = ref(0);
+
+// Editor
+const editorRef = shallowRef();
+const mode = "default";
+const toolbarConfig = {
+  excludeKeys: ["group-video"],
+};
+const editorConfig = {
+  placeholder: "请输入内容...",
+  MENU_CONF: {
+    uploadImage: {
+      async customUpload(file, insertFn) {
+        try {
+          const res = await uploadAdminImage(file);
+          const url = res.data?.data?.url;
+          if (url) {
+            insertFn(getResourceUrl(url), "image", url);
+          } else {
+            ElMessage.error("图片上传失败");
+          }
+        } catch (e) {
+          console.error(e);
+          ElMessage.error("图片上传出错");
+        }
+      },
+    },
+  },
+};
+
+const handleCreated = (editor) => {
+  editorRef.value = editor;
+};
+
+onBeforeUnmount(() => {
+  const editor = editorRef.value;
+  if (editor == null) return;
+  editor.destroy();
+});
+
+const dialogVisible = ref(false);
+const dialogMode = ref("create");
+const editingId = ref(null);
+
+const dialogTitle = computed(() =>
+  dialogMode.value === "create" ? "发布动态" : "编辑动态"
+);
+
+const formRef = ref(null);
+const form = reactive({
+  title: "",
+  author: "",
+  tags: [],
+  time: [],
+  location: "",
+  coverUrl: "",
+  contentHtml: "",
+  enableStatus: 1,
+  studioId: null,
+});
+
+const enableSwitch = computed({
+  get() {
+    return form.enableStatus === 1;
+  },
+  set(v) {
+    form.enableStatus = v ? 1 : 0;
+  },
+});
+
+const rules = {
+  title: [{ required: true, message: "请填写标题", trigger: "blur" }],
+  contentHtml: [{ required: true, message: "请填写内容", trigger: "blur" }],
+};
+
+function resetForm() {
+  form.title = "";
+  form.author = "";
+  form.tags = [];
+  form.time = [];
+  form.location = "";
+  form.coverUrl = "";
+  form.contentHtml = "";
+  form.enableStatus = 1;
+  form.studioId = null;
+}
+
+async function fetchPage() {
+  loading.value = true;
+
+  // 获取工作室列表以供选择
+  try {
+    const sRes = await getAdminStudios();
+    const list = sRes.data?.data || [];
+    studioList.value = list;
+    studioMap.value = {};
+    list.forEach((s) => (studioMap.value[s.id] = s.name));
+  } catch (e) {
+    console.error(e);
+  }
+
+  try {
+    const res = await getAdminStudioNewsPage({
+      page: page.value,
+      size: size.value,
+      keyword: filters.keyword,
+      tags: filters.tags,
+    });
+    const data = res.data?.data || {};
+    total.value = data.total || 0;
+    records.value = Array.isArray(data.records) ? data.records : [];
+  } finally {
+    loading.value = false;
+  }
+}
+
+function openCreate() {
+  dialogMode.value = "create";
+  editingId.value = null;
+  resetForm();
+  dialogVisible.value = true;
+}
+
+function openEdit(row) {
+  dialogMode.value = "edit";
+  editingId.value = row.id;
+  form.title = row.title || "";
+  form.author = row.author || "";
+  form.tags = row.tags ? row.tags.split(",").filter(Boolean) : [];
+  form.time = [row.startTime, row.endTime].filter(Boolean);
+  form.location = row.location || "";
+  form.coverUrl = row.coverUrl || "";
+  form.contentHtml = getResourceHtml(row.contentHtml || "");
+  form.enableStatus = row.enableStatus ?? 1;
+  form.studioId = row.studioId || null;
+  dialogVisible.value = true;
+}
+
+async function submit() {
+  if (!formRef.value) return;
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return;
+    saving.value = true;
+    try {
+      const payload = {
+        title: form.title,
+        author: form.author,
+        tags: Array.isArray(form.tags) ? form.tags.join(",") : "",
+        startTime: form.time?.[0] || null,
+        endTime: form.time?.[1] || null,
+        location: form.location,
+        coverUrl: form.coverUrl,
+        contentHtml: form.contentHtml,
+        publishStatus: 0,
+        enableStatus: form.enableStatus,
+      };
+
+      if (dialogMode.value === "create") {
+        if (!payload.studioId && studioList.value.length > 0) {
+          // 如果是超级管理员(能看到多个工作室)，建议提示选择
+          // 但如果用户只绑定了一个，后端会自动处理，这里可选
+        }
+        // 注意：createAdminStudioNews 第二个参数是 query 里的 studioId
+        await createAdminStudioNews(payload, form.studioId);
+        ElMessage.success("已创建");
+      } else {
+        await updateAdminStudioNews(editingId.value, {
+          ...payload,
+          publishStatus: 1,
+        });
+        ElMessage.success("已保存");
+      }
+      dialogVisible.value = false;
+      await fetchPage();
+    } finally {
+      saving.value = false;
+    }
+  });
+}
+
+async function togglePublish(row) {
+  await setAdminStudioNewsPublishStatus(
+    row.id,
+    row.publishStatus === 1 ? 0 : 1
+  );
+  ElMessage.success("已更新发布状态");
+  await fetchPage();
+}
+
+async function toggleEnable(row, val) {
+  await setAdminStudioNewsEnableStatus(row.id, val ? 1 : 0);
+  ElMessage.success("已更新启用状态");
+  await fetchPage();
+}
+
+async function removeRow(row) {
+  await ElMessageBox.confirm("确认删除该动态？", "提示", { type: "warning" });
+  await deleteAdminStudioNews(row.id);
+  ElMessage.success("已删除");
+  await fetchPage();
+}
+
+async function customUpload(options) {
+  const file = options.file;
+  progressVisible.value = true;
+  progress.value = 0;
+
+  try {
+    const res = await uploadAdminImage(file, (p) => {
+      progress.value = p;
+    });
+
+    const url = res.data?.data?.url;
+    if (!url) {
+      ElMessage.error("上传失败：未返回url");
+      options.onError(new Error("missing url"));
+      return;
+    }
+
+    form.coverUrl = url;
+    ElMessage.success("上传成功");
+    options.onSuccess(res);
+  } catch (e) {
+    options.onError(e);
+  } finally {
+    progressVisible.value = false;
+  }
+}
+
+onMounted(fetchPage);
+</script>
+
 <template>
   <div class="page">
     <CommonCard shadow="never" class="page-card">
@@ -38,7 +318,7 @@
         >
       </div>
 
-      <el-table :data="records" v-loading="loading" style="width: 100%">
+      <el-table v-loading="loading" :data="records" style="width: 100%">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column
           prop="title"
@@ -209,13 +489,13 @@
                 :percentage="progress"
                 style="max-width: 260px"
               />
-              <div class="cover-preview" v-if="form.coverUrl">
+              <div v-if="form.coverUrl" class="cover-preview">
                 <el-image
-                  :src="form.coverUrl"
+                  :src="getResourceUrl(form.coverUrl)"
                   fit="cover"
                   style="width: 180px; height: 100px; border-radius: 8px"
                   preview-teleported
-                  :preview-src-list="[form.coverUrl]"
+                  :preview-src-list="[getResourceUrl(form.coverUrl)]"
                 />
                 <el-button
                   text
@@ -232,15 +512,15 @@
               <Toolbar
                 style="border-bottom: 1px solid #ccc"
                 :editor="editorRef"
-                :defaultConfig="toolbarConfig"
+                :default-config="toolbarConfig"
                 :mode="mode"
               />
               <Editor
-                style="height: 500px; overflow-y: hidden"
                 v-model="form.contentHtml"
-                :defaultConfig="editorConfig"
+                style="height: 500px; overflow-y: hidden"
+                :default-config="editorConfig"
                 :mode="mode"
-                @onCreated="handleCreated"
+                @on-created="handleCreated"
               />
             </div>
           </el-form-item>
@@ -281,285 +561,6 @@
     </el-dialog>
   </div>
 </template>
-
-<script setup>
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  shallowRef,
-} from "vue";
-import { ElMessage, ElMessageBox } from "element-plus";
-import {
-  Check,
-  Close,
-  Delete,
-  Edit,
-  Plus,
-  Promotion,
-  Refresh,
-  Search,
-  Upload,
-} from "@element-plus/icons-vue";
-import { Editor, Toolbar } from "@wangeditor/editor-for-vue";
-import "@wangeditor/editor/dist/css/style.css";
-import {
-  createAdminStudioNews,
-  deleteAdminStudioNews,
-  getAdminStudioNewsPage,
-  setAdminStudioNewsEnableStatus,
-  setAdminStudioNewsPublishStatus,
-  updateAdminStudioNews,
-  uploadAdminImage,
-  getAdminStudios,
-} from "@/api/admin";
-
-const loading = ref(false);
-const saving = ref(false);
-
-const total = ref(0);
-const records = ref([]);
-const studioList = ref([]);
-const studioMap = ref({});
-
-const page = ref(1);
-const size = ref(10);
-const filters = reactive({ keyword: "", tags: "" });
-
-const progressVisible = ref(false);
-const progress = ref(0);
-
-// Editor
-const editorRef = shallowRef();
-const mode = "default";
-const toolbarConfig = {
-  excludeKeys: ["group-video"],
-};
-const editorConfig = {
-  placeholder: "请输入内容...",
-  MENU_CONF: {
-    uploadImage: {
-      async customUpload(file, insertFn) {
-        try {
-          const res = await uploadAdminImage(file);
-          const url = res.data?.data?.url;
-          if (url) {
-            insertFn(url, "image", url);
-          } else {
-            ElMessage.error("图片上传失败");
-          }
-        } catch (e) {
-          console.error(e);
-          ElMessage.error("图片上传出错");
-        }
-      },
-    },
-  },
-};
-
-const handleCreated = (editor) => {
-  editorRef.value = editor;
-};
-
-onBeforeUnmount(() => {
-  const editor = editorRef.value;
-  if (editor == null) return;
-  editor.destroy();
-});
-
-const dialogVisible = ref(false);
-const dialogMode = ref("create");
-const editingId = ref(null);
-
-const dialogTitle = computed(() =>
-  dialogMode.value === "create" ? "发布动态" : "编辑动态",
-);
-
-const formRef = ref(null);
-const form = reactive({
-  title: "",
-  author: "",
-  tags: [],
-  time: [],
-  location: "",
-  coverUrl: "",
-  contentHtml: "",
-  enableStatus: 1,
-  studioId: null,
-});
-
-const enableSwitch = computed({
-  get() {
-    return form.enableStatus === 1;
-  },
-  set(v) {
-    form.enableStatus = v ? 1 : 0;
-  },
-});
-
-const rules = {
-  title: [{ required: true, message: "请填写标题", trigger: "blur" }],
-  contentHtml: [{ required: true, message: "请填写内容", trigger: "blur" }],
-};
-
-function resetForm() {
-  form.title = "";
-  form.author = "";
-  form.tags = [];
-  form.time = [];
-  form.location = "";
-  form.coverUrl = "";
-  form.contentHtml = "";
-  form.enableStatus = 1;
-  form.studioId = null;
-}
-
-async function fetchPage() {
-  loading.value = true;
-
-  // 获取工作室列表以供选择
-  try {
-    const sRes = await getAdminStudios();
-    const list = sRes.data?.data || [];
-    studioList.value = list;
-    studioMap.value = {};
-    list.forEach((s) => (studioMap.value[s.id] = s.name));
-  } catch (e) {
-    console.error(e);
-  }
-
-  try {
-    const res = await getAdminStudioNewsPage({
-      page: page.value,
-      size: size.value,
-      keyword: filters.keyword,
-      tags: filters.tags,
-    });
-    const data = res.data?.data || {};
-    total.value = data.total || 0;
-    records.value = Array.isArray(data.records) ? data.records : [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-function openCreate() {
-  dialogMode.value = "create";
-  editingId.value = null;
-  resetForm();
-  dialogVisible.value = true;
-}
-
-function openEdit(row) {
-  dialogMode.value = "edit";
-  editingId.value = row.id;
-  form.title = row.title || "";
-  form.author = row.author || "";
-  form.tags = row.tags ? row.tags.split(",").filter(Boolean) : [];
-  form.time = [row.startTime, row.endTime].filter(Boolean);
-  form.location = row.location || "";
-  form.coverUrl = row.coverUrl || "";
-  form.contentHtml = row.contentHtml || "";
-  form.enableStatus = row.enableStatus ?? 1;
-  form.studioId = row.studioId || null;
-  dialogVisible.value = true;
-}
-
-async function submit() {
-  if (!formRef.value) return;
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return;
-    saving.value = true;
-    try {
-      const payload = {
-        title: form.title,
-        author: form.author,
-        tags: Array.isArray(form.tags) ? form.tags.join(",") : "",
-        startTime: form.time?.[0] || null,
-        endTime: form.time?.[1] || null,
-        location: form.location,
-        coverUrl: form.coverUrl,
-        contentHtml: form.contentHtml,
-        publishStatus: 0,
-        enableStatus: form.enableStatus,
-      };
-
-      if (dialogMode.value === "create") {
-        if (!payload.studioId && studioList.value.length > 0) {
-          // 如果是超级管理员(能看到多个工作室)，建议提示选择
-          // 但如果用户只绑定了一个，后端会自动处理，这里可选
-        }
-        // 注意：createAdminStudioNews 第二个参数是 query 里的 studioId
-        await createAdminStudioNews(payload, form.studioId);
-        ElMessage.success("已创建");
-      } else {
-        await updateAdminStudioNews(editingId.value, {
-          ...payload,
-          publishStatus: 1,
-        });
-        ElMessage.success("已保存");
-      }
-      dialogVisible.value = false;
-      await fetchPage();
-    } finally {
-      saving.value = false;
-    }
-  });
-}
-
-async function togglePublish(row) {
-  await setAdminStudioNewsPublishStatus(
-    row.id,
-    row.publishStatus === 1 ? 0 : 1,
-  );
-  ElMessage.success("已更新发布状态");
-  await fetchPage();
-}
-
-async function toggleEnable(row, val) {
-  await setAdminStudioNewsEnableStatus(row.id, val ? 1 : 0);
-  ElMessage.success("已更新启用状态");
-  await fetchPage();
-}
-
-async function removeRow(row) {
-  await ElMessageBox.confirm("确认删除该动态？", "提示", { type: "warning" });
-  await deleteAdminStudioNews(row.id);
-  ElMessage.success("已删除");
-  await fetchPage();
-}
-
-async function customUpload(options) {
-  const file = options.file;
-  progressVisible.value = true;
-  progress.value = 0;
-
-  try {
-    const res = await uploadAdminImage(file, (p) => {
-      progress.value = p;
-    });
-
-    const url = res.data?.data?.url;
-    if (!url) {
-      ElMessage.error("上传失败：未返回url");
-      options.onError(new Error("missing url"));
-      return;
-    }
-
-    form.coverUrl = url;
-    ElMessage.success("上传成功");
-    options.onSuccess(res);
-  } catch (e) {
-    options.onError(e);
-  } finally {
-    progressVisible.value = false;
-  }
-}
-
-onMounted(fetchPage);
-</script>
 
 <style scoped>
 .page-header {
