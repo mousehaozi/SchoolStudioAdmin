@@ -17,6 +17,15 @@ export function createAdminStudioNews(data, studioId) {
   });
 }
 
+export function importAdminWechatArticle(url) {
+  return request({
+    url: "/admin/studio-news/import/wechat",
+    method: "post",
+    data: { url },
+    timeout: 60000,
+  });
+}
+
 export function updateAdminStudioNews(id, data) {
   return request({
     url: `/admin/studio-news/${id}`,
