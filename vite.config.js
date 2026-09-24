@@ -1,41 +1,45 @@
 import { fileURLToPath, URL } from "node:url";
 
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
 import vueDevTools from "vite-plugin-vue-devtools";
 
 // https://vite.dev/config/
 
-export default defineConfig({
-  base: "/studio",
-  plugins: [vue(), vueJsx(), vueDevTools()],
-  define: {
-    global: "window",
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd());
 
-  server: {
-    port: 5173,
-    strictPort: true,
-    host: true,
-    proxy: {
-      "/api": {
-        // target: "http://107.174.50.174:8080",
-        // target: "http://127.0.0.1:8080",
-        target: "https://studio-admin.mouse.asia",
-        changeOrigin: true,
-        secure: false,
-        ws: true,
-        rewrite: (path) => {
-          if (path.startsWith("/api/v1")) return path;
-          return path.replace(/^\/api/, "/api/v1");
+  return {
+    base: "/studio",
+    plugins: [vue(), vueJsx(), vueDevTools()],
+    define: {
+      global: "window",
+    },
+
+    server: {
+      port: 5173,
+      strictPort: true,
+      host: true,
+      proxy: {
+        "/api": {
+          // target: "http://107.174.50.174:8080",
+          target: env.VITE_PROXY_TARGET || "http://127.0.0.1:8080",
+          // target: "https://studio-admin.mouse.asia",
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+          rewrite: (path) => {
+            if (path.startsWith("/api/v1")) return path;
+            return path.replace(/^\/api/, "/api/v1");
+          },
         },
       },
     },
-  },
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
     },
-  },
+  };
 });
